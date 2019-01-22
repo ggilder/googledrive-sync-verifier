@@ -26,6 +26,8 @@ import (
 // TODO
 /*
 - Speed up remote manifest! It's so slow!
+	- Main factor seems to be the sheer number of API calls required when doing recursive folder listing
+	- May need to switch back to full listing and building parent relationship map to generate paths
 - Figure out mismatches:
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Ignore icon files locally
