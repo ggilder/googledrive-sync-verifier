@@ -26,7 +26,10 @@ import (
 // TODO
 /*
 - Speed up remote manifest! It's so slow!
-- Revise local manifest to ignore placeholder google docs files - file extensions gsheet, gdoc, gmap
+- Figure out mismatches:
+	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
+	- Ignore icon files locally
+	- Some local files not showing up remotely (special google buzz folder)
 - REFACTOR! especially main, and passing around drive service object everywhere
 */
 
@@ -74,6 +77,8 @@ type googleDriveDirectory struct {
 	Path string
 	Id   string
 }
+
+var ignoredDriveExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
 
 func main() {
 	srv, err := NewGoogleDriveService("credentials.json")
@@ -381,6 +386,12 @@ func normalizePath(entryPath string) string {
 func skipLocalFile(path string) bool {
 	if filepath.Base(path) == ".DS_Store" {
 		return true
+	}
+	ext := filepath.Ext(path)
+	for _, ignoredExt := range ignoredDriveExtensions {
+		if ext == ignoredExt {
+			return true
+		}
 	}
 	return false
 }
