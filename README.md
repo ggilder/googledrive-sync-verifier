@@ -6,5 +6,5 @@ Validate a local directory against Google Drive to make sure all your files are 
 Cross-compile to make a binary that can run on the Synology NAS:
 
 ```
-GOOS=linux GOARCH=amd64 go build drive-verifier.go
+GOOS=linux GOARCH=amd64 go build
 ```
