@@ -67,7 +67,7 @@ type googleDriveDirectory struct {
 var ignoredDriveExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
 
 func main() {
-	srv, err := NewGoogleDriveService("credentials.json")
+	srv, err := NewDriveService("credentials.json")
 
 	// Uncomment the following to allow profiling via http
 	// go func() {

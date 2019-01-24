@@ -17,7 +17,7 @@ import (
 // Google Drive API authorization helpers
 
 // Create service client from file configuration
-func NewGoogleDriveService(credentialPath string) (*drive.Service, error) {
+func NewDriveService(credentialPath string) (*drive.Service, error) {
 	b, err := ioutil.ReadFile(credentialPath)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
