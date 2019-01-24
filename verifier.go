@@ -25,7 +25,6 @@ import (
 /*
 - Figure out mismatches:
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
-	- Ignore icon files locally
 	- Some local files not showing up remotely (special google buzz folder)
 - REFACTOR! especially main
 */
@@ -64,7 +63,8 @@ type googleDriveDirectory struct {
 	Id   string
 }
 
-var ignoredDriveExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
+var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
+var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 
 func main() {
 	srv, err := NewDriveService("credentials.json")
@@ -354,15 +354,20 @@ func normalizePath(entryPath string) string {
 }
 
 func skipLocalFile(path string) bool {
-	if filepath.Base(path) == ".DS_Store" {
-		return true
+	base := filepath.Base(path)
+	for _, ignoredFile := range ignoredFiles {
+		if base == ignoredFile {
+			return true
+		}
 	}
+
 	ext := filepath.Ext(path)
-	for _, ignoredExt := range ignoredDriveExtensions {
+	for _, ignoredExt := range ignoredExtensions {
 		if ext == ignoredExt {
 			return true
 		}
 	}
+
 	return false
 }
 
