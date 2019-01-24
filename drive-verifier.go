@@ -3,12 +3,10 @@ package main
 import (
 	"container/heap"
 	"crypto/md5"
-	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -25,14 +23,11 @@ import (
 
 // TODO
 /*
-- Speed up remote manifest! It's so slow!
-	- Main factor seems to be the sheer number of API calls required when doing recursive folder listing
-	- May need to switch back to full listing and building parent relationship map to generate paths
 - Figure out mismatches:
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Ignore icon files locally
 	- Some local files not showing up remotely (special google buzz folder)
-- REFACTOR! especially main, and passing around drive service object everywhere
+- REFACTOR! especially main
 */
 
 // Uncomment the following to allow profiling via http
@@ -116,6 +111,8 @@ func main() {
 	}
 
 	fmt.Printf("Comparing Google Drive directory \"%v\" to local directory \"%v\"\n", remoteRoot, localRoot)
+	// TODO add caveat about using non-default remote root - may be slow with
+	// many files in account since it's filtering post API calls
 	if !opts.SkipContentHash {
 		fmt.Println("Checking content hashes.")
 	}
@@ -409,112 +406,23 @@ func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.
 	manifest = &FileHeap{}
 	heap.Init(manifest)
 
-	rootId := "root"
-	if rootPath != "/" {
-		rootId, err = resolveGoogleDrivePath(srv, rootPath)
-		if err != nil {
-			return nil, err
+	listing := NewDriveListing(srv)
+	listing.RootPath = rootPath
+	updateChan := make(chan int)
+	go func() {
+		for updateCount := range updateChan {
+			progressChan <- &scanProgressUpdate{Type: remoteProgress, Count: updateCount}
 		}
+	}()
+	files, err := listing.Files(updateChan)
+	if err != nil {
+		return
 	}
-
-	walkGoogleDriveDirectory(srv, rootId, func(file *File) error {
+	for _, file := range files {
 		heap.Push(manifest, file)
-		progressChan <- &scanProgressUpdate{Type: remoteProgress, Count: manifest.Len()}
-		return nil
-	})
+	}
 
 	return manifest, nil
-}
-
-func resolveGoogleDrivePath(srv *drive.Service, path string) (string, error) {
-	pathParts := pathComponents(path)
-	nextId := "root"
-
-	for _, targetPart := range pathParts {
-		targetId := ""
-		files, err := listGoogleDriveDirectory(srv, nextId)
-		if err != nil {
-			return "", err
-		}
-
-		for _, file := range files {
-			if file.MimeType == "application/vnd.google-apps.folder" && file.Name == targetPart {
-				targetId = file.Id
-				break
-			}
-		}
-
-		if targetId == "" {
-			return "", errors.New(fmt.Sprintf("Can't resolve directory \"%s\" in path \"%s\"", targetPart, path))
-		}
-		nextId = targetId
-	}
-
-	return nextId, nil
-}
-
-func pathComponents(targetPath string) (components []string) {
-	if targetPath[0] != '/' {
-		targetPath = "/" + targetPath
-	}
-	for targetPath != "/" {
-		dir := path.Dir(targetPath)
-		base := path.Base(targetPath)
-		components = append([]string{base}, components...)
-		targetPath = dir
-	}
-	return
-}
-
-func walkGoogleDriveDirectory(srv *drive.Service, rootId string, walkFunc func(file *File) error) error {
-	var parent *googleDriveDirectory
-	toWalk := []*googleDriveDirectory{{Id: rootId, Path: ""}}
-
-	for len(toWalk) > 0 {
-		parent, toWalk = toWalk[0], toWalk[1:]
-		files, err := listGoogleDriveDirectory(srv, parent.Id)
-		if err != nil {
-			return err
-		}
-		for _, file := range files {
-			if file.MimeType == "application/vnd.google-apps.folder" {
-				toWalk = append(toWalk, &googleDriveDirectory{Path: path.Join(parent.Path, file.Name), Id: file.Id})
-			} else if file.Md5Checksum != "" {
-				normalizedPath := strings.ToLower(normalizePath(path.Join(parent.Path, file.Name)))
-				err := walkFunc(&File{Path: normalizedPath, ContentHash: file.Md5Checksum})
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func listGoogleDriveDirectory(srv *drive.Service, id string) (files []*drive.File, err error) {
-	nextPageToken := ""
-
-	for {
-		result, err := srv.Files.List().
-			PageToken(nextPageToken).
-			PageSize(1000).
-			Fields("nextPageToken, files(id, name, parents, ownedByMe, trashed, md5Checksum, mimeType)").
-			Q("trashed != true and '" + id + "' in parents").
-			Do()
-		if err != nil {
-			break
-		}
-
-		nextPageToken = result.NextPageToken
-		files = append(files, result.Files...)
-
-		if nextPageToken == "" {
-			break
-		}
-	}
-
-	return files, err
 }
 
 func compareManifests(remoteManifest, localManifest *FileHeap, errored []*FileError) *ManifestComparison {
