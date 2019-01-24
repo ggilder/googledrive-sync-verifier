@@ -23,10 +23,11 @@ import (
 
 // TODO
 /*
-- Figure out mismatches:
+- Make client secret location more sensible/configurable? maybe in home dir somewhere?
+- REFACTOR! especially main
+- Figure out mismatches - maybe low priority since these happen on mac only
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Some local files not showing up remotely (special google buzz folder)
-- REFACTOR! especially main
 */
 
 // Uncomment the following to allow profiling via http
