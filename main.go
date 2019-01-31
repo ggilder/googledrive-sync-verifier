@@ -28,6 +28,7 @@ import (
 - Figure out mismatches - maybe low priority since these happen on mac only
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Some local files not showing up remotely (special google buzz folder)
+- Print some kind of warning when slashes occur in file names? (Client handling seems to be platform-dependent)
 */
 
 // Uncomment the following to allow profiling via http
