@@ -6,8 +6,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"google.golang.org/api/drive/v3"
+
+	"github.com/rafaeljesus/retry-go"
 )
 
 type DriveListing struct {
@@ -91,18 +94,28 @@ func (g *DriveListing) Files(updateChan chan<- int) (files []*File, err error) {
 	return
 }
 
+const apiRetries int = 10
+
 func (g *DriveListing) listAll(nextPageToken string) (result *drive.FileList, err error) {
-	result, err = g.service.Files.List().
-		PageToken(nextPageToken).
-		PageSize(1000).
-		Fields("nextPageToken, files(id, name, parents, ownedByMe, trashed, md5Checksum, mimeType)").
-		Q("trashed != true").
-		Do()
+	err = retry.Do(func() error {
+		result, err = g.service.Files.List().
+			PageToken(nextPageToken).
+			PageSize(1000).
+			Fields("nextPageToken, files(id, name, parents, ownedByMe, trashed, md5Checksum, mimeType)").
+			Q("trashed != true").
+			Do()
+		return err
+	}, apiRetries, time.Second*1)
 	return
 }
 
 func (g *DriveListing) getRootId() (string, error) {
-	file, err := g.service.Files.Get("root").Fields("id").Do()
+	var file *drive.File
+	var err error
+	err = retry.Do(func() error {
+		file, err = g.service.Files.Get("root").Fields("id").Do()
+		return err
+	}, apiRetries, time.Second*1)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("Unable to retrieve root: %v", err))
 	} else {
