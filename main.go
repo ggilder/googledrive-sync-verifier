@@ -16,6 +16,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/jessevdk/go-flags"
+	"github.com/mitchellh/go-homedir"
 
 	"golang.org/x/text/unicode/norm"
 	"google.golang.org/api/drive/v3"
@@ -23,7 +24,6 @@ import (
 
 // TODO
 /*
-- Make client secret location more sensible/configurable? maybe in home dir somewhere?
 - REFACTOR! especially main
 - Figure out mismatches - maybe low priority since these happen on mac only
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
@@ -69,7 +69,14 @@ var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
 var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 
 func main() {
-	srv, err := NewDriveService("credentials.json")
+	homeDir, err := homedir.Dir()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Please set $HOME to a readable path!")
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+	configDir := filepath.Join(homeDir, ".googledrive-sync-verifier")
+	srv, err := NewDriveService(filepath.Join(configDir, "credentials.json"), filepath.Join(configDir, "token.json"))
 
 	// Uncomment the following to allow profiling via http
 	// go func() {

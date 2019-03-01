@@ -17,7 +17,7 @@ import (
 // Google Drive API authorization helpers
 
 // Create service client from file configuration
-func NewDriveService(credentialPath string) (*drive.Service, error) {
+func NewDriveService(credentialPath string, tokenPath string) (*drive.Service, error) {
 	b, err := ioutil.ReadFile(credentialPath)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -28,7 +28,7 @@ func NewDriveService(credentialPath string) (*drive.Service, error) {
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	client := getClient(config)
+	client := getClient(config, tokenPath)
 
 	srv, err := drive.New(client)
 	if err != nil {
@@ -39,11 +39,10 @@ func NewDriveService(credentialPath string) (*drive.Service, error) {
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
-func getClient(config *oauth2.Config) *http.Client {
+func getClient(config *oauth2.Config, tokFile string) *http.Client {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	tokFile := "token.json"
 	tok, err := tokenFromFile(tokFile)
 	if err != nil {
 		tok = getTokenFromWeb(config)
