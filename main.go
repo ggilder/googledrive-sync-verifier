@@ -25,6 +25,9 @@ import (
 // TODO
 /*
 - REFACTOR! especially main
+- Store manifests in a different data structure? Heap is not helping for remote
+  listing since everything is inserted at once. This would also enable additional
+  filtering, for platform-specific slash handling or interpreting " (1)" files
 - Figure out mismatches - maybe low priority since these happen on mac only
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Some local files not showing up remotely (special google buzz folder)
