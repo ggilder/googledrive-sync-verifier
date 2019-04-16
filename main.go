@@ -70,7 +70,7 @@ type googleDriveDirectory struct {
 	Id   string
 }
 
-var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
+var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap", ".gslides", ".gdraw"}
 var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 
 // lowercased by the time we filter
