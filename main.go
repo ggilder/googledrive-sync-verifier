@@ -33,6 +33,7 @@ import (
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Some local files not showing up remotely (special google buzz folder)
 	- Track sync issues better - see todos relating to path filtering
+	- Paths with colons don't sync to linux - flag as known issue?
 */
 
 // Uncomment the following to allow profiling via http
@@ -77,6 +78,8 @@ var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 var ignoredRemoteFiles = [...]string{".ds_store"}
 
 var localDuplicateRegexp = regexp.MustCompile(` \(1\)(/|\.[a-z0-9]+$)`)
+
+// TODO fix slash conflict - it appears after file extension
 var localConflictMarkerRegexp = regexp.MustCompile(`\(slash conflict\)(/|\.[a-z0-9]+$)`)
 
 func main() {
