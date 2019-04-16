@@ -164,5 +164,6 @@ func (g *DriveListing) buildPath(folderId string) (string, error) {
 
 func filterFileName(name string) string {
 	// TOOD ideally original file name would be preserved somewhere for reference
+	// TODO add filtering for trailing space
 	return strings.ReplaceAll(name, "/", "_")
 }
