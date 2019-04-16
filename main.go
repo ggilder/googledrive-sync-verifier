@@ -310,7 +310,7 @@ func handleLocalFile(localRootLowercase string, contentHash bool, processChan <-
 			errorChan <- &FileError{Path: entryPath, Error: err}
 			continue
 		}
-		relPath = normalizePath(relPath)
+		relPath = normalizeUnicodeCharacters(relPath)
 
 		hash := ""
 		if contentHash {
@@ -360,7 +360,7 @@ func relativePath(root string, entryPath string) (string, error) {
 	return relPath, nil
 }
 
-func normalizePath(entryPath string) string {
+func normalizeUnicodeCharacters(entryPath string) string {
 	// Normalize Unicode combining characters
 	return norm.NFC.String(entryPath)
 }

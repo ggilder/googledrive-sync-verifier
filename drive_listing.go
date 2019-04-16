@@ -87,7 +87,7 @@ func (g *DriveListing) Files(updateChan chan<- int) (files []*File, err error) {
 		}
 		// filter files outside of the specified root
 		if !strings.HasPrefix(relPath, "../") {
-			normalizedPath := strings.ToLower(normalizePath(relPath))
+			normalizedPath := strings.ToLower(normalizeUnicodeCharacters(relPath))
 			files = append(files, &File{Path: normalizedPath, ContentHash: file.Md5Checksum})
 		}
 	}
