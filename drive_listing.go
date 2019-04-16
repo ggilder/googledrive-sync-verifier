@@ -81,7 +81,7 @@ func (g *DriveListing) Files(updateChan chan<- int) (files []*File, err error) {
 				return nil, err
 			}
 		}
-		relPath, err := filepath.Rel(g.RootPath, path.Join(parentPath, file.Name))
+		relPath, err := filepath.Rel(g.RootPath, path.Join(parentPath, filterFileName(file.Name)))
 		if err != nil {
 			return nil, err
 		}
@@ -154,10 +154,15 @@ func (g *DriveListing) buildPath(folderId string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			folder.path = path.Join(parentPath, folder.Name)
+			folder.path = path.Join(parentPath, filterFileName(folder.Name))
 		}
 		return folder.path, nil
 	} else {
 		return "", folderNotFoundError{id: folderId}
 	}
+}
+
+func filterFileName(name string) string {
+	// TOOD ideally original file name would be preserved somewhere for reference
+	return strings.ReplaceAll(name, "/", "_")
 }

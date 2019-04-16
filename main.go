@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -28,10 +29,10 @@ import (
 - Store manifests in a different data structure? Heap is not helping for remote
   listing since everything is inserted at once. This would also enable additional
   filtering, for platform-specific slash handling or interpreting " (1)" files
-- Figure out mismatches - maybe low priority since these happen on mac only
+- Reduce mismatch noise
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Some local files not showing up remotely (special google buzz folder)
-- Print some kind of warning when slashes occur in file names? (Client handling seems to be platform-dependent)
+	- Track sync issues better - see todos relating to path filtering
 */
 
 // Uncomment the following to allow profiling via http
@@ -40,8 +41,9 @@ import (
 
 // File stores the result of either Dropbox API or local file listing
 type File struct {
-	Path        string
-	ContentHash string
+	Path         string
+	OriginalPath string
+	ContentHash  string
 }
 
 // FileError records a local file that could not be read due to an error
@@ -70,6 +72,12 @@ type googleDriveDirectory struct {
 
 var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap"}
 var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
+
+// lowercased by the time we filter
+var ignoredRemoteFiles = [...]string{".ds_store"}
+
+var localDuplicateRegexp = regexp.MustCompile(` \(1\)(/|\.[a-z0-9]+$)`)
+var localConflictMarkerRegexp = regexp.MustCompile(`\(slash conflict\)(/|\.[a-z0-9]+$)`)
 
 func main() {
 	homeDir, err := homedir.Dir()
@@ -311,19 +319,26 @@ func handleLocalFile(localRootLowercase string, contentHash bool, processChan <-
 			continue
 		}
 		relPath = normalizeUnicodeCharacters(relPath)
+		filteredPath := filterLocalPath(relPath)
+		originalPath := ""
+		if relPath != filteredPath {
+			originalPath = relPath
+		}
 
 		hash := ""
 		if contentHash {
 			hash, err = hashLocalFile(entryPath)
 			if err != nil {
+				// use relPath here because the error relates to the local file
 				errorChan <- &FileError{Path: relPath, Error: err}
 				continue
 			}
 		}
 
 		resultChan <- &File{
-			Path:        relPath,
-			ContentHash: hash,
+			Path:         filteredPath,
+			OriginalPath: originalPath,
+			ContentHash:  hash,
 		}
 	}
 	wg.Done()
@@ -365,6 +380,23 @@ func normalizeUnicodeCharacters(entryPath string) string {
 	return norm.NFC.String(entryPath)
 }
 
+func filterLocalPath(entryPath string) string {
+	// TODO fix this better - OMG it's even worse because remote files can have
+	// " (1)" in them, so we have to consider both with and without UGH!
+	// Maybe something like adding speculative file entries to the heap with
+	// filtered versions of the path (on both remote and local) - then there
+	// needs to be some way to represent the idea of "only one of these entries
+	// has to match"
+	filtered := entryPath
+	filtered = localDuplicateRegexp.ReplaceAllString(filtered, "$1")
+	filtered = localConflictMarkerRegexp.ReplaceAllString(filtered, "$1")
+	return filtered
+}
+
+func filterRemotePath(entryPath string) string {
+	return entryPath
+}
+
 func skipLocalFile(path string) bool {
 	base := filepath.Base(path)
 	for _, ignoredFile := range ignoredFiles {
@@ -390,6 +422,17 @@ func skipLocalDir(path string) bool {
 	return false
 }
 
+func skipRemoteFile(path string) bool {
+	base := filepath.Base(path)
+	for _, ignoredFile := range ignoredRemoteFiles {
+		if base == ignoredFile {
+			return true
+		}
+	}
+
+	return false
+}
+
 func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.Service, rootPath string) (manifest *FileHeap, err error) {
 	manifest = &FileHeap{}
 	heap.Init(manifest)
@@ -407,6 +450,14 @@ func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.
 		return
 	}
 	for _, file := range files {
+		if skipRemoteFile(file.Path) {
+			continue
+		}
+		originalPath := file.Path
+		file.Path = filterRemotePath(file.Path)
+		if file.Path != originalPath {
+			file.OriginalPath = originalPath
+		}
 		heap.Push(manifest, file)
 	}
 
