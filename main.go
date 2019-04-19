@@ -79,7 +79,7 @@ var ignoredRemoteFiles = [...]string{".ds_store"}
 
 var localDuplicateRegexp = regexp.MustCompile(` \(1\)(/|\.[a-z0-9]+$)`)
 
-// TODO fix slash conflict - it appears after file extension
+// TODO fix slash conflict - it appears after file extension (linux)
 var localConflictMarkerRegexp = regexp.MustCompile(`\(slash conflict\)(/|\.[a-z0-9]+$)`)
 
 func main() {

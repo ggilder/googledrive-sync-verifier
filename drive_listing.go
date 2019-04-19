@@ -132,6 +132,7 @@ func (g *DriveListing) handleDriveFiles(files []*drive.File) int {
 			// ignore files without parent
 			continue
 		} else {
+			// TODO consider handling multiple parents - expand to multiple paths?
 			parentId = file.Parents[0]
 		}
 		if file.MimeType == "application/vnd.google-apps.folder" {
@@ -164,6 +165,6 @@ func (g *DriveListing) buildPath(folderId string) (string, error) {
 
 func filterFileName(name string) string {
 	// TOOD ideally original file name would be preserved somewhere for reference
-	// TODO add filtering for trailing space
+	// TODO add filtering for trailing space (linux)
 	return strings.ReplaceAll(name, "/", "_")
 }
