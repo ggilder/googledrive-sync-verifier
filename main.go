@@ -25,7 +25,6 @@ import (
 
 // TODO
 /*
-- REFACTOR! especially main
 - Store manifests in a different data structure? Heap is not helping for remote
   listing since everything is inserted at once. This would also enable additional
   filtering, for platform-specific slash handling or interpreting " (1)" files
@@ -34,6 +33,7 @@ import (
 	- Some local files not showing up remotely (special google buzz folder)
 	- Track sync issues better - see todos relating to path filtering
 	- Paths with colons don't sync to linux - flag as known issue?
+- REFACTOR! especially main
 */
 
 // Uncomment the following to allow profiling via http
@@ -78,9 +78,7 @@ var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 var ignoredRemoteFiles = [...]string{".ds_store"}
 
 var localDuplicateRegexp = regexp.MustCompile(` \(1\)(/|\.[a-z0-9]+$)`)
-
-// TODO fix slash conflict - it appears after file extension (linux)
-var localConflictMarkerRegexp = regexp.MustCompile(`\(slash conflict\)(/|\.[a-z0-9]+$)`)
+var localConflictMarkerRegexp = regexp.MustCompile(`\(slash conflict\)(/|$)`)
 
 func main() {
 	homeDir, err := homedir.Dir()
