@@ -29,9 +29,9 @@ import (
   listing since everything is inserted at once. This would also enable additional
   filtering, for platform-specific slash handling or interpreting " (1)" files
 - Reduce mismatch noise
+	- Handle sync issues better - see note in filterLocalPath
 	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
 	- Some local files not showing up remotely (special google buzz folder)
-	- Track sync issues better - see todos relating to path filtering
 	- Paths with colons don't sync to linux - flag as known issue?
 - REFACTOR! especially main
 */
