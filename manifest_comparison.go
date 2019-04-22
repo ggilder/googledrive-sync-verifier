@@ -147,7 +147,7 @@ func (mc *ManifestComparison) FindKnownSyncIssues() {
 		file := mc.OnlyRemote[i]
 		if hasKnownSyncIssue(file.Path) {
 			mc.KnownSyncIssues = append([]string{file.Path}, mc.KnownSyncIssues...)
-			deleteFromSlice(mc.OnlyRemote, i)
+			mc.OnlyRemote = deleteFromSlice(mc.OnlyRemote, i)
 		}
 	}
 }
