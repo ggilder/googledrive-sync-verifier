@@ -25,14 +25,6 @@ import (
 
 // TODO
 /*
-- Store manifests in a different data structure? Heap is not helping for remote
-  listing since everything is inserted at once. This would also enable additional
-  filtering, for platform-specific slash handling or interpreting " (1)" files
-- Reduce mismatch noise
-	- Handle sync issues better - see note in filterLocalPath
-	- Remote files with no extension may get synced with an extension - is there another API field that indicates this?
-	- Some local files not showing up remotely (special google buzz folder)
-	- Paths with colons don't sync to linux - flag as known issue?
 - REFACTOR! especially main
 */
 
@@ -77,8 +69,8 @@ var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 // lowercased by the time we filter
 var ignoredRemoteFiles = [...]string{".ds_store"}
 
-var localDuplicateRegexp = regexp.MustCompile(` \(1\)(/|\.[a-z0-9]+$)`)
 var localConflictMarkerRegexp = regexp.MustCompile(`\(slash conflict\)(/|$)`)
+var trailingSpaceRegexp = regexp.MustCompile(` /`)
 
 func main() {
 	homeDir, err := homedir.Dir()
@@ -102,6 +94,7 @@ func main() {
 		SkipContentHash    bool   `long:"skip-hash" description:"Skip checking content hash of local files"`
 		WorkerCount        int    `short:"w" long:"workers" description:"Number of worker threads to use (defaults to 8) - set to 0 to use all CPU cores" default:"8"`
 		FreeMemoryInterval int    `long:"free-memory-interval" description:"Interval (in seconds) to manually release unused memory back to the OS on low-memory systems" default:"0"`
+		Synology           bool   `long:"synology" description:"Skip files known to have sync issues under Synology's Cloud Sync client"`
 	}
 
 	_, err = flags.Parse(&opts)
@@ -145,7 +138,7 @@ func main() {
 	var driveManifest *FileHeap
 	var driveError error
 	go func() {
-		driveManifest, driveError = getGoogleDriveManifest(progressChan, srv, remoteRoot)
+		driveManifest, driveError = getGoogleDriveManifest(progressChan, srv, remoteRoot, opts.Synology)
 		wg.Done()
 	}()
 
@@ -193,7 +186,7 @@ func main() {
 
 	fmt.Println("")
 
-	manifestComparison := compareManifests(driveManifest, localManifest, errored)
+	manifestComparison := compareManifests(driveManifest, localManifest, errored, opts.Synology)
 	manifestComparison.PrintResults()
 }
 
@@ -376,25 +369,21 @@ func relativePath(root string, entryPath string) (string, error) {
 	return relPath, nil
 }
 
+// Normalize Unicode combining characters
 func normalizeUnicodeCharacters(entryPath string) string {
-	// Normalize Unicode combining characters
 	return norm.NFC.String(entryPath)
 }
 
 func filterLocalPath(entryPath string) string {
-	// TODO fix this better - OMG it's even worse because remote files can have
-	// " (1)" in them, so we have to consider both with and without UGH!
-	// Maybe something like adding speculative file entries to the heap with
-	// filtered versions of the path (on both remote and local) - then there
-	// needs to be some way to represent the idea of "only one of these entries
-	// has to match"
 	filtered := entryPath
-	filtered = localDuplicateRegexp.ReplaceAllString(filtered, "$1")
 	filtered = localConflictMarkerRegexp.ReplaceAllString(filtered, "$1")
 	return filtered
 }
 
-func filterRemotePath(entryPath string) string {
+func filterRemotePath(entryPath string, synologyMode bool) string {
+	if synologyMode {
+		return trailingSpaceRegexp.ReplaceAllString(entryPath, "/")
+	}
 	return entryPath
 }
 
@@ -434,7 +423,7 @@ func skipRemoteFile(path string) bool {
 	return false
 }
 
-func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.Service, rootPath string) (manifest *FileHeap, err error) {
+func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.Service, rootPath string, synologyMode bool) (manifest *FileHeap, err error) {
 	manifest = &FileHeap{}
 	heap.Init(manifest)
 
@@ -455,7 +444,7 @@ func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.
 			continue
 		}
 		originalPath := file.Path
-		file.Path = filterRemotePath(file.Path)
+		file.Path = filterRemotePath(file.Path, synologyMode)
 		if file.Path != originalPath {
 			file.OriginalPath = originalPath
 		}
