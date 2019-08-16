@@ -101,9 +101,13 @@ func main() {
 		Synology           bool   `long:"synology" description:"Skip files known to have sync issues under Synology's Cloud Sync client"`
 	}
 
-	_, err = flags.Parse(&opts)
+	args, err := flags.Parse(&opts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+	if len(args) > 0 {
+		fmt.Fprintln(os.Stderr, "Extra arguments provided! Did you mean to use `--local`?")
 		os.Exit(1)
 	}
 
@@ -362,7 +366,7 @@ func relativePath(root string, entryPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if relPath[0:3] == "../" {
+	if len(relPath) >= 3 && relPath[0:3] == "../" {
 		// try lowercase root instead
 		relPath, err = filepath.Rel(strings.ToLower(root), entryPath)
 		if err != nil {
