@@ -25,6 +25,8 @@ import (
 
 // TODO
 /*
+- Try to identify multiple files with same name (on Google Drive side) and flag
+	separately or use different strategy to validate
 - Make it easier to verify local copy with selective sync
 	- Accept list of folder IDs that should be synced?
 	- Can find list using `sqlite3 ~/Library/Application\ Support/Google/Drive/user_default/sync_config.db 'select data_value from data where entry_key = "collections_to_sync";'`
