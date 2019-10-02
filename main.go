@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -27,10 +28,6 @@ import (
 /*
 - Try to identify multiple files with same name (on Google Drive side) and flag
 	separately or use different strategy to validate
-- Make it easier to verify local copy with selective sync
-	- Accept list of folder IDs that should be synced?
-	- Can find list using `sqlite3 ~/Library/Application\ Support/Google/Drive/user_default/sync_config.db 'select data_value from data where entry_key = "collections_to_sync";'`
-	- Alternatively, assume top-level folders in local are correct
 - REFACTOR! especially main
 */
 
@@ -71,6 +68,7 @@ type googleDriveDirectory struct {
 
 var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap", ".gslides", ".gdraw"}
 var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
+var ignoredDirectories = [...]string{"@eaDir", ".tmp.drivedownload"}
 
 // lowercased by the time we filter
 var ignoredRemoteFiles = [...]string{".ds_store"}
@@ -97,6 +95,7 @@ func main() {
 		Verbose            bool   `short:"v" long:"verbose" description:"Show verbose debug information"`
 		RemoteRoot         string `short:"r" long:"remote" description:"Directory in Google Drive to verify" default:""`
 		LocalRoot          string `short:"l" long:"local" description:"Local directory to compare to Google Drive contents" default:"."`
+		SelectiveSync      bool   `long:"selective" description:"Assume local is selectively synced - only check contents of top-level folders in local directory"`
 		SkipContentHash    bool   `long:"skip-hash" description:"Skip checking content hash of local files"`
 		WorkerCount        int    `short:"w" long:"workers" description:"Number of worker threads to use (defaults to 8) - set to 0 to use all CPU cores" default:"8"`
 		FreeMemoryInterval int    `long:"free-memory-interval" description:"Interval (in seconds) to manually release unused memory back to the OS on low-memory systems" default:"0"`
@@ -114,6 +113,14 @@ func main() {
 	}
 
 	localRoot, _ := filepath.Abs(opts.LocalRoot)
+	var localDirs []string
+	if opts.SelectiveSync {
+		localDirs, err = listFolders(opts.LocalRoot)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+	}
 
 	remoteRoot := opts.RemoteRoot
 	if remoteRoot == "" {
@@ -123,7 +130,15 @@ func main() {
 		remoteRoot = "/" + remoteRoot
 	}
 
-	fmt.Printf("Comparing Google Drive directory \"%v\" to local directory \"%v\"\n", remoteRoot, localRoot)
+	if opts.SelectiveSync {
+		fmt.Printf("Comparing subfolders of Google Drive directory \"%v\" to local directory \"%v\":\n", remoteRoot, localRoot)
+		for _, f := range localDirs {
+			fmt.Println(f)
+		}
+		fmt.Println("")
+	} else {
+		fmt.Printf("Comparing Google Drive directory \"%v\" to local directory \"%v\"\n", remoteRoot, localRoot)
+	}
 	// TODO add caveat about using non-default remote root - may be slow with
 	// many files in account since it's filtering post API calls
 	if !opts.SkipContentHash {
@@ -148,7 +163,7 @@ func main() {
 	var driveManifest *FileHeap
 	var driveError error
 	go func() {
-		driveManifest, driveError = getGoogleDriveManifest(progressChan, srv, remoteRoot, opts.Synology)
+		driveManifest, driveError = getGoogleDriveManifest(progressChan, srv, remoteRoot, localDirs, opts.Synology)
 		wg.Done()
 	}()
 
@@ -156,7 +171,7 @@ func main() {
 	var errored []*FileError
 	var localErr error
 	go func() {
-		localManifest, errored, localErr = getLocalManifest(progressChan, localRoot, opts.SkipContentHash, workerCount)
+		localManifest, errored, localErr = getLocalManifest(progressChan, localRoot, localDirs, opts.SkipContentHash, workerCount)
 		wg.Done()
 	}()
 
@@ -242,7 +257,25 @@ func defaultRemoteRoot(localRoot string) string {
 	}
 }
 
-func getLocalManifest(progressChan chan<- *scanProgressUpdate, localRoot string, skipContentHash bool, workerCount int) (manifest *FileHeap, errored []*FileError, err error) {
+func listFolders(localRoot string) (folders []string, err error) {
+	root, err := filepath.Abs(localRoot)
+	if err != nil {
+		return
+	}
+	files, err := ioutil.ReadDir(root)
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		if f.IsDir() && !skipLocalDir(f.Name()) {
+			folders = append(folders, f.Name())
+		}
+	}
+
+	return
+}
+
+func getLocalManifest(progressChan chan<- *scanProgressUpdate, localRoot string, localDirs []string, skipContentHash bool, workerCount int) (manifest *FileHeap, errored []*FileError, err error) {
 	contentHash := !skipContentHash
 	localRootLowercase := strings.ToLower(localRoot)
 	manifest = &FileHeap{}
@@ -260,22 +293,32 @@ func getLocalManifest(progressChan chan<- *scanProgressUpdate, localRoot string,
 
 	// walk in separate goroutine so that sends to errorChan don't block
 	go func() {
-		filepath.Walk(localRoot, func(entryPath string, info os.FileInfo, err error) error {
-			if err != nil {
-				errorChan <- &FileError{Path: entryPath, Error: err}
+		var pathsToWalk []string
+		if len(localDirs) > 0 {
+			for _, dir := range localDirs {
+				pathsToWalk = append(pathsToWalk, filepath.Join(localRoot, dir))
+			}
+		} else {
+			pathsToWalk = append(pathsToWalk, localRoot)
+		}
+		for _, path := range pathsToWalk {
+			filepath.Walk(path, func(entryPath string, info os.FileInfo, err error) error {
+				if err != nil {
+					errorChan <- &FileError{Path: entryPath, Error: err}
+					return nil
+				}
+
+				if info.Mode().IsDir() && skipLocalDir(entryPath) {
+					return filepath.SkipDir
+				}
+
+				if info.Mode().IsRegular() && !skipLocalFile(entryPath) {
+					processChan <- entryPath
+				}
+
 				return nil
-			}
-
-			if info.Mode().IsDir() && skipLocalDir(entryPath) {
-				return filepath.SkipDir
-			}
-
-			if info.Mode().IsRegular() && !skipLocalFile(entryPath) {
-				processChan <- entryPath
-			}
-
-			return nil
-		})
+			})
+		}
 
 		close(processChan)
 	}()
@@ -416,8 +459,11 @@ func skipLocalFile(path string) bool {
 }
 
 func skipLocalDir(path string) bool {
-	if filepath.Base(path) == "@eaDir" {
-		return true
+	base := filepath.Base(path)
+	for _, ignore := range ignoredDirectories {
+		if base == ignore {
+			return true
+		}
 	}
 	return false
 }
@@ -433,12 +479,11 @@ func skipRemoteFile(path string) bool {
 	return false
 }
 
-func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.Service, rootPath string, synologyMode bool) (manifest *FileHeap, err error) {
+func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.Service, rootPath string, subdirectories []string, synologyMode bool) (manifest *FileHeap, err error) {
 	manifest = &FileHeap{}
 	heap.Init(manifest)
 
-	listing := NewDriveListing(srv)
-	listing.RootPath = rootPath
+	listing := NewDriveListing(srv, rootPath, subdirectories)
 	updateChan := make(chan int)
 	go func() {
 		for updateCount := range updateChan {

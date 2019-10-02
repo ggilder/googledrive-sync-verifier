@@ -14,11 +14,12 @@ import (
 )
 
 type DriveListing struct {
-	service      *drive.Service
-	RootPath     string
-	rootId       string
-	driveFiles   []*drive.File
-	driveFolders map[string]*googleDriveFolder
+	service        *drive.Service
+	RootPath       string
+	Subdirectories []string
+	rootId         string
+	driveFiles     []*drive.File
+	driveFolders   map[string]*googleDriveFolder
 }
 
 type googleDriveFolder struct {
@@ -33,10 +34,11 @@ func (e folderNotFoundError) Error() string {
 	return fmt.Sprintf("Folder id %s not found", e.id)
 }
 
-func NewDriveListing(service *drive.Service) *DriveListing {
+func NewDriveListing(service *drive.Service, root string, subdirs []string) *DriveListing {
 	inst := &DriveListing{}
 	inst.service = service
-	inst.RootPath = "/"
+	inst.RootPath = root
+	inst.Subdirectories = subdirs
 	return inst
 }
 
@@ -85,13 +87,36 @@ func (g *DriveListing) Files(updateChan chan<- int) (files []*File, err error) {
 		if err != nil {
 			return nil, err
 		}
-		// filter files outside of the specified root
-		if !strings.HasPrefix(relPath, "../") {
+		if g.includePath(relPath) {
 			normalizedPath := strings.ToLower(normalizeUnicodeCharacters(relPath))
 			files = append(files, &File{Path: normalizedPath, ContentHash: file.Md5Checksum})
 		}
 	}
 	return
+}
+
+func (g *DriveListing) includePath(path string) bool {
+	// filter files outside of the specified root
+	if strings.HasPrefix(path, "../") {
+		return false
+	}
+	// filter files outside of the specified subdirectories
+	// default case - no subdirectories provided, don't need to check
+	if len(g.Subdirectories) == 0 {
+		return true
+	} else {
+		for _, subdir := range g.Subdirectories {
+			rel, err := filepath.Rel(subdir, path)
+			if err != nil {
+				return false
+			}
+			// path is inside subdir, should include
+			if !strings.HasPrefix(rel, "../") {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 const apiRetries int = 10
