@@ -131,11 +131,7 @@ func main() {
 	}
 
 	if opts.SelectiveSync {
-		fmt.Printf("Comparing subfolders of Google Drive directory \"%v\" to local directory \"%v\":\n", remoteRoot, localRoot)
-		for _, f := range localDirs {
-			fmt.Println(f)
-		}
-		fmt.Println("")
+		fmt.Printf("Comparing subfolders of Google Drive directory \"%v\" to local directory \"%v\"\n", remoteRoot, localRoot)
 	} else {
 		fmt.Printf("Comparing Google Drive directory \"%v\" to local directory \"%v\"\n", remoteRoot, localRoot)
 	}
@@ -213,6 +209,13 @@ func main() {
 
 	manifestComparison := compareManifests(driveManifest, localManifest, errored, opts.Synology)
 	manifestComparison.PrintResults()
+
+	if opts.SelectiveSync {
+		fmt.Println("Subfolders verified:")
+		for _, f := range localDirs {
+			fmt.Println(f)
+		}
+	}
 }
 
 func timedManualGC(freeMemoryInterval int, verbose bool) {

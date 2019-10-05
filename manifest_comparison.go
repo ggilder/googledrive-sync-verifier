@@ -157,6 +157,7 @@ func hasKnownSyncIssue(path string) bool {
 }
 
 func (mc *ManifestComparison) PrintResults() {
+	mc.PrintStatus()
 	printFileList(mc.OnlyRemote, "Files only in remote")
 	printFileList(mc.OnlyLocal, "Files only in local")
 	printStringList(mc.ContentMismatch, "Files whose contents don't match")
@@ -164,6 +165,15 @@ func (mc *ManifestComparison) PrintResults() {
 	printKnownSyncList(mc.KnownSyncIssues, "Known sync issues")
 	mc.PrintErrored()
 	mc.PrintSummary()
+}
+
+func (mc *ManifestComparison) PrintStatus() {
+	if mc.Misses > 0 {
+		fmt.Printf("FAILURE: %d sync mismatches detected.\n", mc.Misses)
+	} else {
+		fmt.Printf("SUCCESS: verified local sync.\n")
+	}
+	fmt.Println("")
 }
 
 func printFileList(files []*File, description string) {
