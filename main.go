@@ -216,6 +216,10 @@ func main() {
 			fmt.Println(f)
 		}
 	}
+
+	if !manifestComparison.IsSuccessful() {
+		os.Exit(1)
+	}
 }
 
 func timedManualGC(freeMemoryInterval int, verbose bool) {

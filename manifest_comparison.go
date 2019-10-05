@@ -156,6 +156,10 @@ func hasKnownSyncIssue(path string) bool {
 	return strings.Contains(path, ":")
 }
 
+func (mc *ManifestComparison) IsSuccessful() bool {
+	return mc.Misses > 0
+}
+
 func (mc *ManifestComparison) PrintResults() {
 	mc.PrintStatus()
 	printFileList(mc.OnlyRemote, "Files only in remote")
@@ -168,7 +172,7 @@ func (mc *ManifestComparison) PrintResults() {
 }
 
 func (mc *ManifestComparison) PrintStatus() {
-	if mc.Misses > 0 {
+	if mc.IsSuccessful() {
 		fmt.Printf("FAILURE: %d sync mismatches detected.\n", mc.Misses)
 	} else {
 		fmt.Printf("SUCCESS: verified local sync.\n")
