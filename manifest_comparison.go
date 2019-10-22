@@ -157,7 +157,7 @@ func hasKnownSyncIssue(path string) bool {
 }
 
 func (mc *ManifestComparison) IsSuccessful() bool {
-	return mc.Misses > 0
+	return mc.Misses <= 0
 }
 
 func (mc *ManifestComparison) PrintResults() {
@@ -173,9 +173,9 @@ func (mc *ManifestComparison) PrintResults() {
 
 func (mc *ManifestComparison) PrintStatus() {
 	if mc.IsSuccessful() {
-		fmt.Printf("❌ FAILURE: %d sync mismatches detected.\n", mc.Misses)
-	} else {
 		fmt.Printf("✅ SUCCESS: verified local sync.\n")
+	} else {
+		fmt.Printf("❌ FAILURE: %d sync mismatches detected.\n", mc.Misses)
 	}
 	fmt.Println("")
 }
