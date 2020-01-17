@@ -157,8 +157,11 @@ func (g *DriveListing) handleDriveFiles(files []*drive.File) int {
 			// ignore files without parent
 			continue
 		} else {
-			// TODO consider handling multiple parents - expand to multiple paths?
 			parentId = file.Parents[0]
+			// TODO consider handling multiple parents - expand to multiple paths?
+			// if len(file.Parents) > 1 {
+			// 	fmt.Printf("Multiple parents for %s\n", file.Name)
+			// }
 		}
 		if file.MimeType == "application/vnd.google-apps.folder" {
 			g.driveFolders[file.Id] = &googleDriveFolder{
