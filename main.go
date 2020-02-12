@@ -35,7 +35,7 @@ import (
 // import "net/http"
 // import _ "net/http/pprof"
 
-// File stores the result of either Dropbox API or local file listing
+// File stores the result of either Google Drive API or local file listing
 type File struct {
 	Path         string
 	OriginalPath string
