@@ -66,7 +66,7 @@ type googleDriveDirectory struct {
 	Id   string
 }
 
-var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap", ".gslides", ".gdraw", ".gform"}
+var ignoredExtensions = [...]string{".gdoc", ".gsheet", ".gmap", ".gslides", ".gdraw", ".gform", ".gshortcut"}
 var ignoredFiles = [...]string{"Icon\r", ".DS_Store"}
 var ignoredDirectories = [...]string{"@eaDir", ".tmp.drivedownload"}
 
