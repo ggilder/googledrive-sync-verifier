@@ -133,6 +133,11 @@ func isPossibleMatch(remoteFile, localFile *File) bool {
 	localPath = possibleDuplicateRegexp.ReplaceAllString(localPath, "$1")
 	remotePath = possibleDuplicateRegexp.ReplaceAllString(remotePath, "$1")
 
+	// 3. Special characters represented as underscores vs. spaces in files
+	// downloaded by new (2021) version of Google Drive app
+	localPath = strings.ReplaceAll(localPath, "_", " ")
+	remotePath = strings.ReplaceAll(remotePath, "_", " ")
+
 	// Test match
 	if localPath == remotePath {
 		return true
