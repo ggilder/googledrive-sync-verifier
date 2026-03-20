@@ -492,12 +492,16 @@ func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.
 
 	listing := NewDriveListing(srv, rootPath, subdirectories)
 	updateChan := make(chan int)
+	var forwardWg sync.WaitGroup
+	forwardWg.Add(1)
 	go func() {
+		defer forwardWg.Done()
 		for updateCount := range updateChan {
 			progressChan <- &scanProgressUpdate{Type: remoteProgress, Count: updateCount}
 		}
 	}()
 	files, err := listing.Files(updateChan)
+	forwardWg.Wait()
 	if err != nil {
 		return
 	}
