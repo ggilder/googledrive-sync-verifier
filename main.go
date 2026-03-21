@@ -501,6 +501,7 @@ func getGoogleDriveManifest(progressChan chan<- *scanProgressUpdate, srv *drive.
 		}
 	}()
 	files, err := listing.Files(updateChan)
+	close(updateChan)
 	forwardWg.Wait()
 	if err != nil {
 		return
